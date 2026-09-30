@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Entre estrelas</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden}
+body{
+  background:radial-gradient(circle at 50% 45%,#18234d 0,#090d24 38%,#03040d 100%);
+  color:#fff;font-family:Georgia,serif;
+}
+canvas{position:fixed;inset:0;width:100%;height:100%}
+.screen{
+  position:relative;z-index:2;width:100%;height:100%;
+  display:flex;align-items:center;justify-content:center;text-align:center;
+  padding:25px;
+}
+.card{
+  max-width:720px;padding:35px 28px;
+  background:rgba(3,5,18,.45);border:1px solid rgba(255,255,255,.13);
+  border-radius:24px;backdrop-filter:blur(5px);
+  box-shadow:0 0 60px rgba(90,110,255,.12);
+}
+h1{font-size:clamp(28px,6vw,54px);font-weight:normal;letter-spacing:1px;margin:0 0 14px}
+p{font-size:18px;line-height:1.7;margin:8px 0;color:#dfe4ff}
+button{
+  margin-top:20px;padding:12px 24px;border-radius:30px;border:1px solid #bfc8ff;
+  background:rgba(255,255,255,.08);color:white;font:inherit;cursor:pointer;
+}
+button:hover{background:rgba(255,255,255,.16)}
+.hidden{display:none!important}
+.star{
+ position:absolute;width:17px;height:17px;border-radius:50%;cursor:pointer;z-index:4;
+ background:white;box-shadow:0 0 9px 3px rgba(210,220,255,.9);
+ animation:pulse 2.2s infinite ease-in-out;
+}
+.star.done{box-shadow:0 0 18px 6px rgba(255,255,255,.95);transform:scale(1.18)}
+@keyframes pulse{50%{opacity:.45;transform:scale(.7)}}
+.line{position:absolute;height:1px;background:rgba(220,225,255,.34);transform-origin:left center;z-index:3}
+#hint{position:absolute;top:25px;left:50%;transform:translateX(-50%);z-index:5;
+font-size:15px;color:#cdd4ff;opacity:.85}
+#phrase{
+position:absolute;left:50%;top:75%;transform:translate(-50%,-50%);
+z-index:5;width:min(650px,90%);font-size:20px;line-height:1.6;
+opacity:0;transition:opacity 1s;color:#fff;
+}
+#poem{
+position:relative;z-index:6;width:min(760px,94%);max-height:84vh;overflow:auto;
+padding:30px;border-radius:24px;background:rgba(3,5,18,.78);
+border:1px solid rgba(255,255,255,.16);box-shadow:0 0 80px rgba(120,140,255,.18);
+white-space:pre-line;text-align:left;line-height:1.8;font-size:17px;
+}
+#poem h2{text-align:center;font-weight:normal;font-size:30px;margin-top:0}
+#music{position:fixed;left:-9999px}
+</style>
+</head>
+<body>
+<canvas id="sky"></canvas>
+
+<audio id="music" loop>
+  <source src="heaven.mp3" type="audio/mpeg">
+</audio>
+
+<section id="intro" class="screen">
+ <div class="card">
+   <h1>Um céu feito de pequenas coisas.</h1>
+   <p>Algumas histórias não aparecem de uma vez.<br>É preciso encontrar cada estrela.</p>
+   <button id="start">Entrar no céu ✦</button>
+ </div>
+</section>
+
+<section id="game" class="screen hidden">
+ <div id="hint">Encontre as estrelas. Cada uma guarda uma parte.</div>
+ <div id="stars"></div>
+ <div id="phrase"></div>
+</section>
+
+<section id="final" class="screen hidden">
+ <div id="poem">
+   <h2>Para você, entre todas as estrelas. ✦</h2>
+   <div id="poemText"></div>
+ </div>
+</section>
+
+<script>
+const poem = `Todos os poucos abraços que te dei,
+Todos os poucos beijos que te beijei,
+E até mesmo as besteiras que já falei,
+Cada coisa é bem guardada,
+Pra não ser abafada,
+Por tudo que já te contei.
+
+Quero te falar o quanto te gosto,
+E não é nem o tanto que te mostro,
+Até porque não posso.
+Mas um dia quero te falar tudo o que tenho vontade,
+Pra eu me sentir à vontade,
+E nunca perder a vontade
+De um dia te amar,
+Pois é algo que já não aguento esperar.
+
+Quero ser sua,
+Assim como você vai ser meu.
+E, sem uma sombra de dúvidas,
+Meu coração te escolheu.
+E nem adianta impedir,
+Que ele não vai desistir,
+E nem você dele vai sumir.
+
+Pois não existe nada melhor que te amar,
+Que poder sua boca beijar.
+Não tem nada melhor que você,
+E ninguém vai me convencer
+Que existe algo melhor
+Do que ao seu lado permanecer.
+
+Eu quero tanto te dar todos os abraços que não pude.
+Olha, meu amor, por favor, confia em mim.
+Que comigo não vai ter fim.
+
+Por você eu sou a fim,
+E nada no mundo vai mudar isso em mim.
+Quero você pra sempre,
+Sempre.
+
+Mesmo nos dias mais difíceis,
+Quero estar do seu lado,
+Pra nada ser acabado,
+E poder ver seus olhinhos de perto,
+Como se nunca tivesse olhado.`;
+
+const messages=[
+ "Todos os poucos abraços que te dei...",
+ "Cada pequena coisa é bem guardada.",
+ "Quero te falar o quanto te gosto.",
+ "Meu coração te escolheu.",
+ "Quero estar do seu lado.",
+ "Mesmo nos dias difíceis.",
+ "Quero você pra sempre.",
+ "Sempre."
+];
+
+const positions=[
+ [23,29],[38,20],[55,27],[69,22],[78,39],[62,48],[45,55],[30,45]
+];
+
+const sky=document.getElementById('sky'),ctx=sky.getContext('2d');
+function resize(){sky.width=innerWidth*devicePixelRatio;sky.height=innerHeight*devicePixelRatio;ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0)}
+addEventListener('resize',resize);resize();
+
+let bg=[];
+for(let i=0;i<180;i++) bg.push({x:Math.random()*innerWidth,y:Math.random()*innerHeight,r:Math.random()*1.4+.2,a:Math.random()*.7+.2});
+function draw(){
+ ctx.clearRect(0,0,innerWidth,innerHeight);
+ bg.forEach(s=>{ctx.globalAlpha=s.a;ctx.fillStyle='white';ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill()});
+ requestAnimationFrame(draw);
+}
+draw();
+
+const stars=document.getElementById('stars'), phrase=document.getElementById('phrase');
+let found=0;
+positions.forEach((p,i)=>{
+ const el=document.createElement('div');el.className='star';el.style.left=p[0]+'%';el.style.top=p[1]+'%';
+ el.title='Estrela '+(i+1);
+ el.onclick=()=>{
+   if(el.classList.contains('done'))return;
+   el.classList.add('done');found++;
+   phrase.textContent=messages[i];phrase.style.opacity=1;
+   setTimeout(()=>phrase.style.opacity=0,2400);
+   if(found===positions.length){
+     document.getElementById('hint').textContent='As estrelas se encontraram...';
+     setTimeout(showFinal,2600);
+   }
+ };
+ stars.appendChild(el);
+});
+
+function showFinal(){
+ document.getElementById('game').classList.add('hidden');
+ document.getElementById('final').classList.remove('hidden');
+ document.getElementById('poemText').textContent=poem;
+}
+document.getElementById('start').onclick=()=>{
+ document.getElementById('intro').classList.add('hidden');
+ document.getElementById('game').classList.remove('hidden');
+ const m=document.getElementById('music');m.play().catch(()=>{});
+};
+</script>
+</body>
+</html>
